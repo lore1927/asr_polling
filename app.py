@@ -15,7 +15,7 @@ url_default = "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 url_input = st.text_input("URL Target: ", value=url_default)
 
 # Pulsante di avvio
-if st.button("Avvia"):  
+if st.button("Avvia"):      
     with st.spinner("In corso... Riavvia la pagina per annullare coglione"):
         # 1. Inizializzazione dello script
         automation = QueueItAutomation(
@@ -24,8 +24,8 @@ if st.button("Avvia"):
             target_url=url_input,
             event_id="asrabbonamenti2022"
         )
-        # Area dedicata ai log dinamici che si aggiorneranno a schermo
-        log_area = st.empty()
+        
+        log_area = st.empty()  
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
         log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso...")
@@ -93,9 +93,12 @@ if st.button("Avvia"):
             log_area.empty() # Pulisce la zona log per fare spazio al risultato
             st.success("Finocchiò (Lorenzo no) procedura completata sbrigateeeeeeee")
             
-            # Box di testo con il tasto di copia automatico in alto a destra
+            # Box di testo con il tasto di copia automatico
             st.write("URL di accesso:")
             st.code(automation.redirect_url, language="text")
+            
+            # Pulsante cliccabile che apre l'URL direttamente
+            st.link_button("Apri link di accesso", automation.redirect_url)
         else:
             log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Timeout raggiunto.")
             st.error("Procedura fallita o timeout")
