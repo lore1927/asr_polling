@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import json
 from datetime import datetime
 from queue_it_automation import QueueItAutomation
 
@@ -46,14 +47,8 @@ if st.button("Avvia"):
         for attempt in range(1, max_attempts + 1):
             timestamp = datetime.now().strftime("%H:%M:%S")
             
-            # Mostra a video il tentativo corrente e l'orario
-            log_area.code(
-                f"[{timestamp}] Tentativo {attempt}/{max_attempts}\n"
-                f"In attesa del turno..."
-            )
-            
             try:
-                # Esegue la singola chiamata usando la sessione di automation
+                # Costruisce la chiamata di status
                 url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/{automation.queue_id}/status"
                 params = {
                     "cid": "it-IT", "l": "Asroma prod Abbonamenti",
@@ -63,10 +58,23 @@ if st.button("Avvia"):
                     "targetUrl": automation.target_url, "customUrlParams": "", "layoutVersion": 180105136056,
                     "layoutName": "Asroma prod Abbonamenti", "isClientRedayToRedirect": False, "isBeforeOrIdle": False
                 }
+                
+                # Esegue la chiamata
                 response = automation.session.post(url, params=params, json=body, timeout=10)
-                response.raise_for_status()
+                status_code = response.status_code
                 data = response.json()
                 
+                # Formatta il JSON ricevuto per renderlo leggibile a schermo
+                json_readable = json.dumps(data, indent=2)
+                
+                # Aggiorna il log a schermo mostrando la risposta esatta del server
+                log_area.code(
+                    f"[{timestamp}] TENTATIVO {attempt}/{max_attempts}\n"
+                    f"HTTP Status: {status_code}\n"
+                    f"Risposta Server:\n{json_readable}"
+                )
+                
+                # Controllo se il turno è arrivato
                 if "redirectUrl" in data and data.get("isRedirectToTarget"):
                     automation.redirect_url = data["redirectUrl"]
                     success = True
