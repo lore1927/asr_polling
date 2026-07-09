@@ -31,12 +31,20 @@ if st.button("Avvia"):
         )
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta di Enqueue...")
+        enqueue_url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/enqueue"
+        enqueue_params = {"cid": "it-IT", "l": "Asroma prod Abbonamenti", "t": automation.target_url}
+        
+        log_area.code(
+            f"[{datetime.now().strftime('%H:%M:%S')}] RICHIESTA ENQUEUE\n"
+            f"URL: {enqueue_url}\n"
+            f"Params: {json.dumps(enqueue_params, indent=2)}\n"
+            f"Inviando richiesta..."
+        )
+        
         if not automation.step_enqueue():
             st.error("Procedura fallita durante l'enqueue.")
             st.stop()
             
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Enqueue completato. ID Coda: {automation.queue_id}")
         automation.step_generate_session_params()
         
         # 3. Polling visibile a schermo (Max 15 minuti = 450 tentativi da 2 secondi)
@@ -64,14 +72,25 @@ if st.button("Avvia"):
                 status_code = response.status_code
                 data = response.json()
                 
-                # Formatta il JSON ricevuto per renderlo leggibile a schermo
-                json_readable = json.dumps(data, indent=2)
+                # Filtra e tiene solo le informazioni pulite della risposta
+                clean_response = {
+                    "queueId": automation.queue_id,
+                    "isBeforeOrIdle": data.get("isBeforeOrIdle"),
+                    "QueueState": data.get("QueueState"),
+                    "forecastStatus": data.get("forecastStatus"),
+                    "ticket": data.get("ticket", {})
+                }
                 
-                # Aggiorna il log a schermo mostrando la risposta esatta del server
+                # Aggiorna il log a schermo con input ed esito pulito
                 log_area.code(
                     f"[{timestamp}] TENTATIVO {attempt}/{max_attempts}\n"
+                    f"--------------------------------------------------\n"
                     f"HTTP Status: {status_code}\n"
-                    f"Risposta Server:\n{json_readable}"
+                    f"URL Status: {url}\n"
+                    f"Params: {json.dumps(params, indent=2)}\n"
+                    f"Body: {json.dumps(body, indent=2)}\n"
+                    f"--------------------------------------------------\n"
+                    f"Risposta Server Filtrata:\n{json.dumps(clean_response, indent=2)}"
                 )
                 
                 # Controllo se il turno è arrivato
