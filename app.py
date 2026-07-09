@@ -1,6 +1,5 @@
 import streamlit as st
 import time
-import json
 from datetime import datetime
 from queue_it_automation import QueueItAutomation
 
@@ -17,11 +16,7 @@ url_input = st.text_input("URL Target: ", value=url_default)
 
 # Pulsante di avvio
 if st.button("Avvia"):
-    # Area dedicata ai log dinamici che si aggiorneranno a schermo
-    log_area = st.empty()
-    
     with st.spinner("In corso... Riavvia la pagina per annullare coglione"):
-        
         # 1. Inizializzazione dello script
         automation = QueueItAutomation(
             vendor="webroma", 
@@ -29,17 +24,12 @@ if st.button("Avvia"):
             target_url=url_input,
             event_id="asrabbonamenti2022"
         )
-        
+
+        # Area dedicata ai log dinamici che si aggiorneranno a schermo
+        log_area = st.empty()    
+    
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        enqueue_url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/enqueue"
-        enqueue_params = {"cid": "it-IT", "l": "Asroma prod Abbonamenti", "t": automation.target_url}
-        
-        log_area.code(
-            f"[{datetime.now().strftime('%H:%M:%S')}] RICHIESTA ENQUEUE\n"
-            f"URL: {enqueue_url}\n"
-            f"Params: {json.dumps(enqueue_params, indent=2)}\n"
-            f"Inviando richiesta..."
-        )
+        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso...")
         
         if not automation.step_enqueue():
             st.error("Procedura fallita durante l'enqueue.")
@@ -59,12 +49,12 @@ if st.button("Avvia"):
                 # Costruisce la chiamata di status
                 url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/{automation.queue_id}/status"
                 params = {
-                    "cid": "it-IT", "l": "Asroma prod Abbonamenti",
+                    "cid": "it-IT", "l": "Asroma+prod+Abbonamenti",
                     "t": automation.target_url, "seid": automation.seid, "sets": automation.sets
                 }
                 body = {
                     "targetUrl": automation.target_url, "customUrlParams": "", "layoutVersion": 180105136056,
-                    "layoutName": "Asroma prod Abbonamenti", "isClientRedayToRedirect": False, "isBeforeOrIdle": False
+                    "layoutName": "Asroma prod Abbonamenti", "isClientRedayToRedirect": True, "isBeforeOrIdle": False
                 }
                 
                 # Esegue la chiamata
@@ -72,25 +62,20 @@ if st.button("Avvia"):
                 status_code = response.status_code
                 data = response.json()
                 
-                # Filtra e tiene solo le informazioni pulite della risposta
-                clean_response = {
-                    "queueId": automation.queue_id,
-                    "isBeforeOrIdle": data.get("isBeforeOrIdle"),
-                    "QueueState": data.get("QueueState"),
-                    "forecastStatus": data.get("forecastStatus"),
-                    "ticket": data.get("ticket", {})
-                }
+                # Estrae solo i dati utili dal dizionario "ticket"
+                ticket = data.get("ticket", {})
+                inline_ahead = ticket.get("usersInLineAheadOfYou", "0")
+                wait_time = ticket.get("whichIsIn", "N/D")
+                forecast = data.get("forecastStatus", "N/D")
                 
-                # Aggiorna il log a schermo con input ed esito pulito
+                # Stringhe compatte per input su una riga
+                input_str = f"cid:it-IT | l:Asroma+prod+Abbonamenti | seid:{automation.seid[:8]}... | sets:{automation.sets}"
+                
+                # Log super compatto: riga 1 identificativi, riga 2 input, riga 3 risposta
                 log_area.code(
-                    f"[{timestamp}] TENTATIVO {attempt}/{max_attempts}\n"
-                    f"--------------------------------------------------\n"
-                    f"HTTP Status: {status_code}\n"
-                    f"URL Status: {url}\n"
-                    f"Params: {json.dumps(params, indent=2)}\n"
-                    f"Body: {json.dumps(body, indent=2)}\n"
-                    f"--------------------------------------------------\n"
-                    f"Risposta Server Filtrata:\n{json.dumps(clean_response, indent=2)}"
+                    f"[{timestamp}] TENTATIVO {attempt}/{max_attempts} | Queue ID: {automation.queue_id}\n"
+                    f"INPUT  -> HTTP POST | {url} | Params/Body: {input_str}\n"
+                    f"OUTPUT -> HTTP {status_code} | Stato: {forecast} | In coda davanti: {inline_ahead} | Attesa: {wait_time}"
                 )
                 
                 # Controllo se il turno è arrivato
