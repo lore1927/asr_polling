@@ -15,7 +15,7 @@ url_default = "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 url_input = st.text_input("URL Target: ", value=url_default)
 
 # Pulsante di avvio
-if st.button("Avvia"):
+if st.button("Avvia"):  
     with st.spinner("In corso... Riavvia la pagina per annullare coglione"):
         # 1. Inizializzazione dello script
         automation = QueueItAutomation(
@@ -24,10 +24,9 @@ if st.button("Avvia"):
             target_url=url_input,
             event_id="asrabbonamenti2022"
         )
-
         # Area dedicata ai log dinamici che si aggiorneranno a schermo
-        log_area = st.empty()    
-    
+        log_area = st.empty()
+        
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
         log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso...")
         
@@ -71,7 +70,7 @@ if st.button("Avvia"):
                 # Stringhe compatte per input su una riga
                 input_str = f"cid:it-IT | l:Asroma+prod+Abbonamenti | seid:{automation.seid[:8]}... | sets:{automation.sets}"
                 
-                # Log super compatto: riga 1 identificativi, riga 2 input, riga 3 risposta
+                # Log super compatto
                 log_area.code(
                     f"[{timestamp}] TENTATIVO {attempt}/{max_attempts} | Queue ID: {automation.queue_id}\n"
                     f"INPUT  -> HTTP POST | {url} | Params/Body: {input_str}\n"
@@ -93,7 +92,10 @@ if st.button("Avvia"):
         if success:
             log_area.empty() # Pulisce la zona log per fare spazio al risultato
             st.success("Finocchiò (Lorenzo no) procedura completata sbrigateeeeeeee")
-            st.text_input("URL di accesso: ", value=automation.redirect_url)
+            
+            # Box di testo con il tasto di copia automatico in alto a destra
+            st.write("URL di accesso:")
+            st.code(automation.redirect_url, language="text")
         else:
             log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Timeout raggiunto.")
             st.error("Procedura fallita o timeout")
