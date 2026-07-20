@@ -14,12 +14,28 @@ url_default = "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 # Casella di testo modificabile
 url_input = st.text_input("URL Target: ", value=url_default)
 
+# Selettore orizzontale per il tipo di Vendor (Mutuamente esclusivo, default su CLASSIC)
+vendor_choice = st.radio(
+    "Seleziona pacchetto / vendor:",
+    options=["CLASSIC", "EXTRA", "PLUS"],
+    index=0,  # 0 corrisponde a CLASSIC
+    horizontal=True
+)
+
+# Mappatura delle scelte con i rispettivi valori richiesti dallo script
+vendor_mapping = {
+    "CLASSIC": "webroma",
+    "EXTRA": "webext",
+    "PLUS": "asrwriv"
+}
+selected_vendor = vendor_mapping[vendor_choice]
+
 # Pulsante di avvio
 if st.button("Avvia"):      
     with st.spinner("In corso... Riavvia la pagina per annullare coglione"):
-        # 1. Inizializzazione dello script
+        # 1. Inizializzazione dello script con il vendor dinamico
         automation = QueueItAutomation(
-            vendor="webroma", 
+            vendor=selected_vendor, 
             language="IT", 
             target_url=url_input,
             event_id="asrabbonamenti2022"
@@ -28,7 +44,7 @@ if st.button("Avvia"):
         log_area = st.empty()  
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso...")
+        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Vendor: {selected_vendor}...")
         
         if not automation.step_enqueue():
             st.error("Procedura fallita durante l'enqueue.")
@@ -68,7 +84,7 @@ if st.button("Avvia"):
                 forecast = data.get("forecastStatus", "N/D")
                 
                 # Stringhe compatte per input su una riga
-                input_str = f"cid:it-IT | l:Asroma+prod+Abbonamenti | seid:{automation.seid[:8]}... | sets:{automation.sets}"
+                input_str = f"vendor:{selected_vendor} | cid:it-IT | seid:{automation.seid[:8]}... | sets:{automation.sets}"
                 
                 # Log super compatto
                 log_area.code(
