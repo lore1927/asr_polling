@@ -16,7 +16,7 @@ url_input = st.text_input("URL Target: ", value=url_default)
 
 # Selettore orizzontale per il tipo di Vendor (Mutuamente esclusivo, default su CLASSIC)
 vendor_choice = st.radio(
-    "Seleziona pacchetto / vendor:",
+    "Tipo abbonamento:",
     options=["CLASSIC", "EXTRA", "PLUS"],
     index=0,  # 0 corrisponde a CLASSIC
     horizontal=True
