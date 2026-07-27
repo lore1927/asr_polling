@@ -14,37 +14,44 @@ url_default = "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 # Casella di testo modificabile
 url_input = st.text_input("URL Target: ", value=url_default)
 
-# Selettore orizzontale per il tipo di Vendor (Mutuamente esclusivo, default su CLASSIC)
+# Checkbox per la Waiting List
+is_waiting_list = st.checkbox("Waiting List")
+
+# Selettore orizzontale per il tipo di Vendor (disabilitato se Waiting List è attivo)
 vendor_choice = st.radio(
     "Tipo abbonamento:",
     options=["CLASSIC", "EXTRA", "PLUS"],
     index=0,  # 0 corrisponde a CLASSIC
-    horizontal=True
+    horizontal=True,
+    disabled=is_waiting_list
 )
 
-# Mappatura delle scelte con i rispettivi valori richiesti dallo script
+# Mappatura delle scelte
 vendor_mapping = {
     "CLASSIC": "webroma",
     "EXTRA": "webext",
     "PLUS": "asrwriv"
 }
-selected_vendor = vendor_mapping[vendor_choice]
+
+# Se Waiting List è attivo, force "venpre", altrimenti usa la scelta del radio button
+selected_vendor = "venpre" if is_waiting_list else vendor_mapping[vendor_choice]
 
 # Pulsante di avvio
-if st.button("Avvia"):      
-    with st.spinner("In corso... Riavvia la pagina per annullare coglione"):
-        # 1. Inizializzazione dello script con il vendor dinamico
+if st.button("Avvia"):     
+    with st.spinner("In corso... Riavvia la pagina per annullare"):
+        # 1. Inizializzazione dello script con il vendor e il flag waiting_list
         automation = QueueItAutomation(
             vendor=selected_vendor, 
             language="IT", 
             target_url=url_input,
-            event_id="asrabbonamenti2022"
+            event_id="asrabbonamenti2022",
+            is_waiting_list=is_waiting_list
         )
         
         log_area = st.empty()  
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Vendor: {selected_vendor}...")
+        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Vendor: {selected_vendor} (Waiting List: {is_waiting_list})...")
         
         if not automation.step_enqueue():
             st.error("Procedura fallita durante l'enqueue.")
@@ -106,8 +113,8 @@ if st.button("Avvia"):
         
         # 4. Esito finale
         if success:
-            log_area.empty() # Pulisce la zona log per fare spazio al risultato
-            st.success("Finocchiò (Lorenzo no) procedura completata sbrigateeeeeeee")
+            log_area.empty()
+            st.success("Procedura completata!")
             
             # Box di testo con il tasto di copia automatico
             st.write("URL di accesso:")
