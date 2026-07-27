@@ -17,6 +17,14 @@ url_input = st.text_input("URL Target: ", value=url_default)
 # Campo per l'Event ID con valore di default "asrabbonamenti2022"
 event_id_input = st.text_input("Event ID:", value="asrabbonamenti2022")
 
+# Campo per la Layout Version con valore di default "180105136056"
+layout_version_input = st.number_input(
+    "Layout Version:", 
+    value=180105136056, 
+    step=1, 
+    format="%d"
+)
+
 # Checkbox per la Waiting List
 is_waiting_list = st.checkbox("Abilita Waiting List (WLIST)")
 
@@ -40,22 +48,24 @@ selected_vendor = "venpre" if is_waiting_list else vendor_mapping[vendor_choice]
 # Pulsante di avvio
 if st.button("Avvia"):     
     with st.spinner("In corso... Riavvia la pagina per annullare"):
-        # 1. Inizializzazione dello script con l'Event ID personalizzato e il flag waiting list
+        # 1. Inizializzazione dello script con l'Event ID e la Layout Version personalizzati
         automation = QueueItAutomation(
             vendor=selected_vendor, 
             language="IT", 
             target_url=url_input,
             event_id=event_id_input,
-            is_waiting_list=is_waiting_list
+            is_waiting_list=is_waiting_list,
+            layout_version=layout_version_input
         )
         
         log_area = st.empty()  
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Event ID '{automation.EVENT_ID}' e Target URL: {automation.target_url}...")
+        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Event ID '{automation.EVENT_ID}' e LayoutVersion {automation.layout_version}...")
         
-        if not automation.step_enqueue():
-            st.error("Procedura fallita durante l'enqueue.")
+        success_enqueue, msg_enqueue = automation.step_enqueue()
+        if not success_enqueue:
+            st.error(f"Procedura fallita durante l'enqueue: {msg_enqueue}")
             st.stop()
             
         automation.step_generate_session_params()
@@ -69,15 +79,22 @@ if st.button("Avvia"):
             timestamp = datetime.now().strftime("%H:%M:%S")
             
             try:
-                # Costruisce la chiamata di status con il nuovo EVENT_ID
+                # Costruisce la chiamata di status con il nuovo EVENT_ID e LAYOUT_VERSION
                 url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/{automation.queue_id}/status"
                 params = {
-                    "cid": "it-IT", "l": "Asroma+prod+Abbonamenti",
-                    "t": automation.target_url, "seid": automation.seid, "sets": automation.sets
+                    "cid": "it-IT", 
+                    "l": "Asroma+prod+Abbonamenti",
+                    "t": automation.target_url, 
+                    "seid": automation.seid, 
+                    "sets": automation.sets
                 }
                 body = {
-                    "targetUrl": automation.target_url, "customUrlParams": "", "layoutVersion": 180105136056,
-                    "layoutName": "Asroma prod Abbonamenti", "isClientRedayToRedirect": True, "isBeforeOrIdle": False
+                    "targetUrl": automation.target_url, 
+                    "customUrlParams": "", 
+                    "layoutVersion": automation.layout_version,
+                    "layoutName": "Asroma prod Abbonamenti", 
+                    "isClientRedayToRedirect": True, 
+                    "isBeforeOrIdle": False
                 }
                 
                 # Esegue la chiamata
@@ -92,7 +109,7 @@ if st.button("Avvia"):
                 forecast = data.get("forecastStatus", "N/D")
                 
                 # Stringhe compatte per input su una riga
-                input_str = f"event:{automation.EVENT_ID} | vendor:{selected_vendor} | cid:it-IT | seid:{automation.seid[:8]}... | sets:{automation.sets}"
+                input_str = f"event:{automation.EVENT_ID} | layoutVer:{automation.layout_version} | vendor:{selected_vendor} | seid:{automation.seid[:8]}..."
                 
                 # Log super compatto
                 log_area.code(
