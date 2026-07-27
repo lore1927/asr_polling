@@ -13,17 +13,31 @@ class QueueItAutomation:
     BASE_URL = "https://bestunion.queue-it.net"
     CUSTOMER_ID = "bestunion"
     
-    def __init__(self, vendor: str = "webroma", language: str = "IT", target_url: str = None, event_id: str = "asrabbonamenti2022"):
+    def __init__(self, vendor: str = "webroma", language: str = "IT", target_url: str = None, event_id: str = "asrabbonamenti2022", is_waiting_list: bool = False):
         self.vendor = vendor
         self.language = language
         self.session = requests.Session()
         self.EVENT_ID = event_id
         
-        # Se viene passato un URL specifico dai bottoni usa quello, altrimenti usa il default
-        if target_url:
-            self.target_url = target_url + f"?lang={language}&vendor={vendor}"
+        # Costruzione parametri query string per l'URL target
+        params = {
+            "lang": language
+        }
+        
+        if is_waiting_list:
+            params["promo"] = "WLIST"
+            params["vendor"] = "venpre"
         else:
-            self.target_url = f"https://biglietti.asroma.com/tickets/season/pre/MAN132/D19?lang={language}&vendor={vendor}"
+            params["vendor"] = vendor
+
+        query_string = urlencode(params)
+        
+        # Se viene passato un URL specifico dai bottoni usa quello, altrimenti usa il default
+        base = target_url if target_url else "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
+        
+        # Gestisce la presenza di eventuali query params già esistenti nell'URL base
+        separator = "&" if "?" in base else "?"
+        self.target_url = f"{base}{separator}{query_string}"
         
         self.queue_id: Optional[str] = None
         self.seid: Optional[str] = None
@@ -35,15 +49,6 @@ class QueueItAutomation:
     def log(self, level: str, message: str) -> None:
         timestamp = datetime.now().strftime("%H:%M:%S")
         print(f"[{timestamp}] [{level}] | {message}")
-    
-    #def extract_google_params(self, url: str) -> Dict[str, str]:
-    #    parsed = urlparse(url)
-    #    params = parse_qs(parsed.query)
-    #    google_params = {}
-    #    for key, values in params.items():
-    #        if key in ['_gl', '_ga', '_gcl_au'] or key.startswith('_ga_'):
-    #            google_params[key] = values[0] if values else ''
-    #    return google_params
     
     def step_enqueue(self) -> bool:
         url = f"{self.BASE_URL}/spa-api/queue/{self.CUSTOMER_ID}/{self.EVENT_ID}/enqueue"
