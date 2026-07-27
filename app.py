@@ -6,52 +6,53 @@ from queue_it_automation import QueueItAutomation
 st.set_page_config(page_title="Queue Automation", layout="centered")
 
 st.title("Automazione Queue-it AS Roma")
-st.write("Verifica o modifica l'URL target e avvia lo script.")
+st.write("Verifica o modifica i parametri e avvia lo script.")
 
 # URL di default impostato nella casella di testo
 url_default = "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 
-# Casella di testo modificabile
+# Casella di testo modificabile per l'URL Target
 url_input = st.text_input("URL Target: ", value=url_default)
 
-# Checkbox per la Waiting List
-is_waiting_list = st.checkbox("Waiting List")
+# Campo per l'Event ID con valore di default "asrabbonamenti2022"
+event_id_input = st.text_input("Event ID:", value="asrabbonamenti2022")
 
-# Selettore orizzontale per il tipo di Vendor (disabilitato se Waiting List è attivo)
+# Checkbox per la Waiting List
+is_waiting_list = st.checkbox("Abilita Waiting List (WLIST)")
+
+# Selettore orizzontale per il tipo di Vendor (disabilitato se Waiting List è attiva)
 vendor_choice = st.radio(
     "Tipo abbonamento:",
     options=["CLASSIC", "EXTRA", "PLUS"],
-    index=0,  # 0 corrisponde a CLASSIC
+    index=0,
     horizontal=True,
     disabled=is_waiting_list
 )
 
-# Mappatura delle scelte
+# Mappatura delle scelte con i rispettivi valori richiesti dallo script
 vendor_mapping = {
     "CLASSIC": "webroma",
     "EXTRA": "webext",
     "PLUS": "asrwriv"
 }
-
-# Se Waiting List è attivo, force "venpre", altrimenti usa la scelta del radio button
 selected_vendor = "venpre" if is_waiting_list else vendor_mapping[vendor_choice]
 
 # Pulsante di avvio
 if st.button("Avvia"):     
     with st.spinner("In corso... Riavvia la pagina per annullare"):
-        # 1. Inizializzazione dello script con il vendor e il flag waiting_list
+        # 1. Inizializzazione dello script con l'Event ID personalizzato e il flag waiting list
         automation = QueueItAutomation(
             vendor=selected_vendor, 
             language="IT", 
             target_url=url_input,
-            event_id="asrabbonamenti2022",
+            event_id=event_id_input,
             is_waiting_list=is_waiting_list
         )
         
         log_area = st.empty()  
         
         # 2. Richiesta iniziale di ingresso in coda (Enqueue)
-        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Vendor: {selected_vendor} (Waiting List: {is_waiting_list})...")
+        log_area.code(f"[{datetime.now().strftime('%H:%M:%S')}] Richiesta Enqueue in corso con Event ID '{automation.EVENT_ID}' e Target URL: {automation.target_url}...")
         
         if not automation.step_enqueue():
             st.error("Procedura fallita durante l'enqueue.")
@@ -68,7 +69,7 @@ if st.button("Avvia"):
             timestamp = datetime.now().strftime("%H:%M:%S")
             
             try:
-                # Costruisce la chiamata di status
+                # Costruisce la chiamata di status con il nuovo EVENT_ID
                 url = f"{automation.BASE_URL}/spa-api/queue/{automation.CUSTOMER_ID}/{automation.EVENT_ID}/{automation.queue_id}/status"
                 params = {
                     "cid": "it-IT", "l": "Asroma+prod+Abbonamenti",
@@ -91,7 +92,7 @@ if st.button("Avvia"):
                 forecast = data.get("forecastStatus", "N/D")
                 
                 # Stringhe compatte per input su una riga
-                input_str = f"vendor:{selected_vendor} | cid:it-IT | seid:{automation.seid[:8]}... | sets:{automation.sets}"
+                input_str = f"event:{automation.EVENT_ID} | vendor:{selected_vendor} | cid:it-IT | seid:{automation.seid[:8]}... | sets:{automation.sets}"
                 
                 # Log super compatto
                 log_area.code(
@@ -113,7 +114,7 @@ if st.button("Avvia"):
         
         # 4. Esito finale
         if success:
-            log_area.empty()
+            log_area.empty() # Pulisce la zona log per fare spazio al risultato
             st.success("Procedura completata!")
             
             # Box di testo con il tasto di copia automatico
