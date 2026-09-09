@@ -1,104 +1,239 @@
 #!/usr/bin/env python3
+
 import requests
 import uuid
 import time
-from datetime import datetime
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
+
 
 class QueueItAutomation:
     """Automazione del flusso Queue-it per AS Roma"""
-    
+
     BASE_URL = "https://bestunion.queue-it.net"
     CUSTOMER_ID = "bestunion"
-    
+
     def __init__(
-        self, 
-        vendor: str = "webroma", 
-        language: str = "IT", 
-        target_url: str = None, 
-        event_id: str = "asrabbonamenti2022", 
-        is_waiting_list: bool = False,
-        layout_version: int = 180105136056
+        self,
+        language: str = "it",
+        target_url: str = None,
+        event_id: str = "asrbiglietti2021drb",
+        layout_version: int = 180627395026,
+        layout_name: str = "Asroma prod finale",
+        layout_name_query: str = "Asroma+prod+finale",
+        extra_url_params: str = "",
+        use_extra_url_params: bool = False
     ):
-        self.vendor = vendor
+
         self.language = language
         self.session = requests.Session()
-        
-        # Header per simulare un browser reale (Chrome su Windows)
+
+        # ========================================================
+        # HEADER
+        # ========================================================
+
         self.session.headers.update({
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/152.0.0.0 Safari/537.36"
+            ),
+            "Accept": (
+                "application/json, text/javascript, */*; q=0.01"
+            ),
+            "Accept-Language": (
+                "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
+            ),
             "Content-Type": "application/json",
-            "Origin": "https://bestunion.queue-it.net",
+            "Origin": self.BASE_URL,
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-Queueit-QPage-Referral": "https://www.asroma.com/"
         })
-        
-        self.EVENT_ID = event_id
-        self.layout_version = int(layout_version)
-        
-        # Gestione URL Target
-        base_target = target_url.split("?")[0] if target_url else "https://biglietti.asroma.com/tickets/season/pre/MAN132/D19"
 
-        if is_waiting_list:
-            self.target_url = f"{base_target}?lang={language}&promo=WLIST&vendor=venpre"
-        else:
-            self.target_url = f"{base_target}?lang={language}&vendor={vendor}"
-        
+        # ========================================================
+        # PARAMETRI QUEUE-IT
+        # ========================================================
+
+        self.EVENT_ID = event_id
+
+        self.layout_version = int(layout_version)
+
+        # Versione con gli spazi.
+        # Utilizzata nel campo "layoutName" del body.
+        self.layout_name = layout_name
+
+        # Versione con i "+".
+        # Utilizzata nel parametro "l" della query string.
+        self.layout_name_query = layout_name_query
+
+        # ========================================================
+        # COSTRUZIONE TARGET URL
+        # ========================================================
+
+        base_target = (
+            target_url.split("?")[0]
+            if target_url
+            else (
+                "https://biglietti.asroma.com/"
+                "tickets/pre/MAN133/001"
+            )
+        )
+
+        self.target_url = base_target
+
+        # --------------------------------------------------------
+        # Parametri extra
+        # --------------------------------------------------------
+        #
+        # Esempi accettati:
+        #
+        # ?promo=VENPRE&vendor=venpre
+        #
+        # oppure:
+        #
+        # promo=VENPRE&vendor=venpre
+        #
+        # Il "?" viene aggiunto automaticamente.
+        # --------------------------------------------------------
+
+        if use_extra_url_params and extra_url_params:
+
+            extra = extra_url_params.strip()
+
+            if extra.startswith("?"):
+                extra = extra[1:]
+
+            if extra:
+                self.target_url += "?" + extra
+
+        # ========================================================
+        # VARIABILI DELLA CODA
+        # ========================================================
+
         self.queue_id: Optional[str] = None
         self.seid: Optional[str] = None
         self.sets: Optional[int] = None
         self.redirect_url: Optional[str] = None
 
+    # ============================================================
+    # ENQUEUE
+    # ============================================================
+
     def step_enqueue(self) -> Tuple[bool, str]:
-        url = f"{self.BASE_URL}/spa-api/queue/{self.CUSTOMER_ID}/{self.EVENT_ID}/enqueue"
-        
-        # Referrer dinamico basato sull'URL della coda reale Queue-it
-        queue_page_url = f"{self.BASE_URL}/?c={self.CUSTOMER_ID}&e={self.EVENT_ID}&cid={self.language.lower()}-{self.language.upper()}&t={self.target_url}"
-        
+
+        url = (
+            f"{self.BASE_URL}/spa-api/queue/"
+            f"{self.CUSTOMER_ID}/"
+            f"{self.EVENT_ID}/enqueue"
+        )
+
+        # --------------------------------------------------------
+        # Referrer dinamico basato sull'URL della coda Queue-it
+        # --------------------------------------------------------
+
+        queue_page_url = (
+            f"{self.BASE_URL}/"
+            f"?c={self.CUSTOMER_ID}"
+            f"&e={self.EVENT_ID}"
+            f"&cid={self.language.lower()}-"
+            f"{self.language.upper()}"
+            f"&t={self.target_url}"
+        )
+
         headers = {
             "Referer": queue_page_url
         }
-        
+
+        # --------------------------------------------------------
+        # Query parameters
+        # --------------------------------------------------------
+
         params = {
             "cid": "it-IT",
-            "l": "Asroma prod Abbonamenti",
+            "l": self.layout_name_query,
             "t": self.target_url
         }
-        
+
+        # --------------------------------------------------------
+        # Body
+        # --------------------------------------------------------
+
         body = {
             "challengeSessions": [],
-            "layoutName": "Asroma prod Abbonamenti",
+            "layoutName": self.layout_name,
             "customUrlParams": "",
             "targetUrl": self.target_url,
             "Referrer": "https://www.asroma.com/"
         }
-        
+
         try:
-            response = self.session.post(url, params=params, json=body, headers=headers, timeout=50)
-            
+
+            response = self.session.post(
+                url,
+                params=params,
+                json=body,
+                headers=headers,
+                timeout=50
+            )
+
+            # ----------------------------------------------------
+            # Controllo HTTP
+            # ----------------------------------------------------
+
             if not response.ok:
-                return False, f"HTTP {response.status_code}: {response.text}"
-                
+
+                return (
+                    False,
+                    f"HTTP {response.status_code}: "
+                    f"{response.text}"
+                )
+
             data = response.json()
-            
-            # Se la challenge fallisce, verifichiamo la risposta
+
+            # ----------------------------------------------------
+            # Controllo Challenge
+            # ----------------------------------------------------
+
             if data.get("challengeFailed"):
-                return False, f"Blocco Challenge/Anti-bot attivo da Queue-it: {data}"
-                
+
+                return (
+                    False,
+                    "Blocco Challenge/Anti-bot attivo "
+                    f"da Queue-it: {data}"
+                )
+
+            # ----------------------------------------------------
+            # Recupero Queue ID
+            # ----------------------------------------------------
+
             self.queue_id = data.get("queueId")
-            
+
             if self.queue_id:
+
                 return True, "OK"
-            else:
-                return False, f"Risposta senza queueId: {data}"
-                
+
+            return (
+                False,
+                f"Risposta senza queueId: {data}"
+            )
+
         except Exception as e:
-            return False, f"Eccezione Enqueue: {str(e)}"
+
+            return (
+                False,
+                f"Eccezione Enqueue: {str(e)}"
+            )
+
+    # ============================================================
+    # SESSION PARAMETERS
+    # ============================================================
 
     def step_generate_session_params(self) -> bool:
+
         self.sets = int(time.time() * 1000)
+
         self.seid = str(uuid.uuid4())
+
         return True
